@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(D:/JetBrains/python.exe *)",
+      "Bash(\"D:/一面千识/online_recommend/venv/Scripts/pip.exe\" install *)",
+      "Bash(\"D:/一面千识/online_recommend/venv/Scripts/python.exe\" init_db.py)",
+      "Bash(npm install *)",
+      "Bash(npx vite *)",
+      "Bash(../venv/Scripts/python init_db.py)"
+    ]
+  }
+}
