@@ -1,0 +1,1 @@
+import{a as e}from"./request-DDMgiCcc.js";const s=o=>e.get("/recommend/",{params:o}),r=o=>e.get("/recommend/popular",{params:o}),c=()=>e.get("/recommend/profile"),m=()=>e.post("/recommend/profile/refresh"),a=o=>e.post("/recommend/click",o),n=()=>e.get("/recommend/stats");export{r as a,c as b,n as c,s as g,m as r,a as t};

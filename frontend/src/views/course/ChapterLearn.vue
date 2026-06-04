@@ -17,7 +17,7 @@
           </span>
           <span class="timer">
             <el-icon><Clock /></el-icon>
-            本次学习：{{ formatSeconds(elapsedSeconds) }}
+            本课程本次学习：{{ formatSeconds(elapsedSeconds) }}
           </span>
         </div>
       </div>
@@ -157,7 +157,6 @@ async function sendLearningRecord() {
       course_id: parseInt(route.params.id),
       chapter_id: parseInt(route.params.chapterId),
       action: 'progress',
-      progress: 0,
       duration: duration
     })
   } catch (e) {
@@ -173,7 +172,6 @@ function handleBeforeUnload() {
     course_id: parseInt(route.params.id),
     chapter_id: parseInt(route.params.chapterId),
     action: 'progress',
-    progress: 0,
     duration: duration
   })
   const token = localStorage.getItem('access_token')
@@ -189,10 +187,8 @@ function handleLeave() {
 
 async function navigateChapter(ch) {
   if (!ch || !canAccess(ch)) return
-  await sendLearningRecord()
   router.push(`/course/${route.params.id}/chapter/${ch.id}`)
   await loadChapter(ch.id)
-  startTimer()
 }
 
 async function loadChapter(chapterId) {

@@ -6,7 +6,14 @@
       "Bash(\"D:/一面千识/online_recommend/venv/Scripts/python.exe\" init_db.py)",
       "Bash(npm install *)",
       "Bash(npx vite *)",
-      "Bash(../venv/Scripts/python init_db.py)"
+      "Bash(../venv/Scripts/python init_db.py)",
+      "Bash(ls venv/Scripts/python.exe)",
+      "Bash(ls venv/bin/python)",
+      "Bash(venv/Scripts/pip.exe install *)",
+      "Bash(rm -f education.db)",
+      "Bash(venv/Scripts/python.exe init_db.py)",
+      "Bash(timeout 5 venv/Scripts/python.exe -c \"from app import create_app; app = create_app\\(\\); print\\('App created successfully'\\); print\\('Routes:'\\); [print\\(f'  {rule}'\\) for rule in sorted\\([str\\(r\\) for r in app.url_map.iter_rules\\(\\) if r.rule.startswith\\('/api'\\)]\\)]\")",
+      "Bash(./venv/Scripts/python -c ' *)"
     ]
   }
 }

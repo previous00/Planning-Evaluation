@@ -1,0 +1,1 @@
+import{a as e}from"./request-DDMgiCcc.js";const r=s=>e.get("/courses",{params:s}),c=s=>e.get(`/courses/${s}`),a=s=>e.post("/courses",s),u=(s,o)=>e.put(`/courses/${s}`,o),g=s=>e.delete(`/courses/${s}`),n=()=>e.get("/courses/categories");export{r as a,c as b,a as c,g as d,n as g,u};

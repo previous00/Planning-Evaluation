@@ -32,17 +32,12 @@
 
             <!-- 已登录 + 已报名/免费课程 -->
             <template v-else-if="enrolled">
-              <el-button v-if="!isLearning" type="primary" size="large" :loading="learningLoading" @click="startLearning">
-                {{ userProgress ? '继续学习' : '开始学习' }}
-              </el-button>
-              <el-button v-else type="danger" size="large" @click="stopLearning">
-                结束本次学习
-              </el-button>
-              <span v-if="isLearning" class="timer">
-                <el-icon><Clock /></el-icon> 本次已学习：{{ currentSessionTime }}
+              <span v-if="userProgress" class="progress-text">
+                <el-icon><TrendCharts /></el-icon>
+                学习进度 {{ userProgress.progress }}%
               </span>
-              <span v-if="userProgress && !isLearning" class="progress-text">
-                已学习 {{ userProgress.progress }}%
+              <span v-else class="progress-text hint">
+                点击下方章节开始学习
               </span>
             </template>
 
@@ -51,14 +46,11 @@
               <el-button type="warning" size="large" @click="handleEnroll">
                 购买课程 ¥{{ course.price }}
               </el-button>
-              <el-button size="large" @click="trialLearn" :disabled="trialUsed">
-                {{ trialUsed ? '试学已结束' : '免费试学' }}
-              </el-button>
             </template>
           </div>
 
           <el-alert v-if="!enrolled && userStore.isLoggedIn && course.price > 0" type="info" :closable="false" style="margin-top: 12px;">
-            该课程为付费课程，购买后可完整学习。未购买只能试学前10%的内容。
+            该课程为付费课程，购买后可完整学习所有章节。
           </el-alert>
         </div>
       </div>
@@ -112,14 +104,52 @@
         </div>
       </el-card>
     </template>
+
+    <!-- Coupon Selection Dialog -->
+    <el-dialog v-model="couponDialogVisible" title="选择优惠券" width="500px" :close-on-click-modal="false">
+      <p class="coupon-hint">检测到您有可用优惠券，是否使用？</p>
+      <div class="coupon-list">
+        <div
+          v-for="c in availableCoupons"
+          :key="c.order_id"
+          class="coupon-option"
+          :class="{ selected: selectedCoupon === c.order_id }"
+          @click="selectedCoupon = c.order_id"
+        >
+          <div class="coupon-left">
+            <span class="coupon-discount">-¥{{ c.discount }}</span>
+          </div>
+          <div class="coupon-right">
+            <span class="coupon-name">{{ c.item_name }}</span>
+            <span class="coupon-condition">满{{ c.min_amount }}元可用，到手价 ¥{{ c.final_price }}</span>
+          </div>
+          <el-icon v-if="selectedCoupon === c.order_id" class="check-icon"><Check /></el-icon>
+        </div>
+        <div
+          class="coupon-option no-coupon"
+          :class="{ selected: selectedCoupon === null }"
+          @click="selectedCoupon = null"
+        >
+          <div class="coupon-right">
+            <span class="coupon-name">不使用优惠券</span>
+            <span class="coupon-condition">原价购买 ¥{{ course?.price }}</span>
+          </div>
+          <el-icon v-if="selectedCoupon === null" class="check-icon"><Check /></el-icon>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="couponDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="confirmPurchaseWithCoupon">确认购买</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getCourse } from '../../api/course'
-import { getCourseProgress, recordLearning, checkEnrollment, enrollCourse } from '../../api/learning'
+import { getCourseProgress, recordLearning, checkEnrollment, enrollCourse, getAvailableCoupons } from '../../api/learning'
 import { getChapters } from '../../api/chapter'
 import { useUserStore } from '../../store/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -131,21 +161,14 @@ const userStore = useUserStore()
 const course = ref(null)
 const userProgress = ref(null)
 const loading = ref(true)
-const learningLoading = ref(false)
 const enrolled = ref(false)
-const trialUsed = ref(false)
 const chapters = ref([])
-
-// 学习计时相关
-const isLearning = ref(false)
-const learnStartTime = ref(null)
-const elapsedSeconds = ref(0)
-let timerInterval = null
+const couponDialogVisible = ref(false)
+const availableCoupons = ref([])
+const selectedCoupon = ref(null)
 
 const difficultyMap = { beginner: '入门', intermediate: '中级', advanced: '高级' }
 const difficultyType = { beginner: 'success', intermediate: 'warning', advanced: 'danger' }
-
-const currentSessionTime = computed(() => formatSeconds(elapsedSeconds.value))
 
 function formatDuration(min) {
   if (min >= 60) return `${Math.floor(min / 60)}小时${min % 60 ? min % 60 + '分' : ''}`
@@ -165,98 +188,6 @@ function formatSeconds(sec) {
 function formatTime(iso) {
   if (!iso) return ''
   return new Date(iso).toLocaleString('zh-CN')
-}
-
-function startTimer() {
-  learnStartTime.value = Date.now()
-  elapsedSeconds.value = 0
-  timerInterval = setInterval(() => {
-    elapsedSeconds.value = Math.floor((Date.now() - learnStartTime.value) / 1000)
-  }, 1000)
-}
-
-function stopTimer() {
-  if (timerInterval) {
-    clearInterval(timerInterval)
-    timerInterval = null
-  }
-  const duration = Math.floor((Date.now() - learnStartTime.value) / 1000)
-  return duration
-}
-
-async function startLearning() {
-  isLearning.value = true
-  startTimer()
-  ElMessage.success('学习计时开始，点击"结束本次学习"保存进度')
-}
-
-async function stopLearning() {
-  const duration = stopTimer()
-  isLearning.value = false
-  learningLoading.value = true
-
-  try {
-    const currentProgress = userProgress.value ? userProgress.value.progress : 0
-    // 根据学习时长计算进度增长：每分钟增加约课程总时长的对应比例
-    const courseTotalSeconds = course.value.duration * 60
-    const progressIncrement = Math.round((duration / courseTotalSeconds) * 100)
-    const newProgress = Math.min(currentProgress + Math.max(progressIncrement, 1), 100)
-
-    const res = await recordLearning({
-      course_id: course.value.id,
-      action: userProgress.value ? 'progress' : 'start',
-      progress: newProgress,
-      duration: duration
-    })
-
-    userProgress.value = res.progress
-    ElMessage.success(
-      `本次学习 ${formatSeconds(duration)}，进度更新至 ${newProgress}%` +
-      (newProgress >= 100 ? ' 恭喜完成课程！' : '')
-    )
-  } catch (e) {
-    console.error('保存学习记录失败:', e)
-  } finally {
-    learningLoading.value = false
-  }
-}
-
-async function trialLearn() {
-  isLearning.value = true
-  startTimer()
-  trialUsed.value = true
-
-  // 试学限制：30秒后自动结束
-  setTimeout(async () => {
-    if (!isLearning.value) return
-    const duration = stopTimer()
-    isLearning.value = false
-
-    try {
-      const currentProgress = userProgress.value ? userProgress.value.progress : 0
-      const newProgress = Math.min(currentProgress + 5, 10) // 试学最多到10%
-
-      await recordLearning({
-        course_id: course.value.id,
-        action: 'progress',
-        progress: newProgress,
-        duration: duration
-      })
-
-      const pRes = await getCourseProgress(route.params.id)
-      userProgress.value = pRes.progress
-    } catch (e) {
-      // 忽略，试学可能被限制
-    }
-
-    ElMessageBox.alert(
-      '试学时间已结束，购买课程后可完整学习全部内容。',
-      '试学结束',
-      { confirmButtonText: '我知道了', type: 'info' }
-    )
-  }, 30000)
-
-  ElMessage.info('试学模式：可体验30秒，购买后解锁完整课程')
 }
 
 function canAccessChapter(ch) {
@@ -280,16 +211,44 @@ function handleChapterClick(ch) {
 
 async function handleEnroll() {
   try {
-    await ElMessageBox.confirm(
-      `确认购买课程「${course.value.title}」？价格：¥${course.value.price}`,
-      '购买课程',
-      { confirmButtonText: '确认购买', cancelButtonText: '取消', type: 'info' }
-    )
-    await enrollCourse({ course_id: course.value.id })
-    enrolled.value = true
-    ElMessage.success('购买成功！现在可以开始学习了')
+    const couponRes = await getAvailableCoupons(course.value.id)
+    const coupons = couponRes.coupons || []
+
+    if (coupons.length > 0) {
+      availableCoupons.value = coupons
+      selectedCoupon.value = null
+      couponDialogVisible.value = true
+    } else {
+      await ElMessageBox.confirm(
+        `确认购买课程「${course.value.title}」？价格：¥${course.value.price}`,
+        '购买课程',
+        { confirmButtonText: '确认购买', cancelButtonText: '取消', type: 'info' }
+      )
+      await doEnroll(null)
+    }
   } catch (e) {
     if (e !== 'cancel') console.error('购买失败:', e)
+  }
+}
+
+async function confirmPurchaseWithCoupon() {
+  couponDialogVisible.value = false
+  await doEnroll(selectedCoupon.value)
+}
+
+async function doEnroll(couponOrderId) {
+  try {
+    const payload = { course_id: course.value.id }
+    if (couponOrderId) payload.coupon_order_id = couponOrderId
+    const res = await enrollCourse(payload)
+    enrolled.value = true
+    if (res.discount > 0) {
+      ElMessage.success(`购买成功！优惠${res.discount}元，实付¥${res.final_price}`)
+    } else {
+      ElMessage.success('购买成功！现在可以开始学习了')
+    }
+  } catch (e) {
+    console.error('购买失败:', e)
   }
 }
 
@@ -318,17 +277,15 @@ onMounted(async () => {
     const res = await getCourse(route.params.id)
     course.value = res.course
 
-    // Load chapters
     try {
       const chRes = await getChapters(route.params.id)
       chapters.value = chRes.chapters
     } catch (e) { /* no chapters */ }
 
     if (userStore.isLoggedIn) {
-      // 记录浏览
       try {
         await recordLearning({ course_id: course.value.id, action: 'view', progress: 0, duration: 0 })
-      } catch (e) { /* ignore view record errors */ }
+      } catch (e) { /* ignore */ }
 
       await Promise.all([loadProgress(), loadEnrollment()])
     }
@@ -336,12 +293,6 @@ onMounted(async () => {
     ElMessage.error('加载课程信息失败')
   } finally {
     loading.value = false
-  }
-})
-
-onBeforeUnmount(() => {
-  if (timerInterval) {
-    clearInterval(timerInterval)
   }
 })
 </script>
@@ -407,16 +358,17 @@ onBeforeUnmount(() => {
   gap: 16px;
   flex-wrap: wrap;
 }
-.timer {
+.progress-text {
   display: flex;
   align-items: center;
-  gap: 4px;
-  color: #e6a23c;
+  gap: 6px;
+  color: #409eff;
   font-size: 16px;
   font-weight: bold;
 }
-.progress-text {
-  color: #409eff;
+.progress-text.hint {
+  color: #909399;
+  font-weight: normal;
   font-size: 14px;
 }
 .detail-body {
@@ -514,5 +466,66 @@ onBeforeUnmount(() => {
 .play-icon {
   color: #409eff;
   font-size: 18px;
+}
+.coupon-hint {
+  color: #666;
+  margin: 0 0 16px;
+  font-size: 14px;
+}
+.coupon-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.coupon-option {
+  display: flex;
+  align-items: center;
+  padding: 14px 16px;
+  border: 2px solid #f0f0f0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+.coupon-option:hover {
+  border-color: #c6e2ff;
+}
+.coupon-option.selected {
+  border-color: #409eff;
+  background: #ecf5ff;
+}
+.coupon-left {
+  margin-right: 16px;
+  padding-right: 16px;
+  border-right: 1px dashed #ddd;
+}
+.coupon-discount {
+  font-size: 20px;
+  font-weight: bold;
+  color: #f56c6c;
+  white-space: nowrap;
+}
+.coupon-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.coupon-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+}
+.coupon-condition {
+  font-size: 12px;
+  color: #999;
+}
+.check-icon {
+  color: #409eff;
+  font-size: 20px;
+  margin-left: 12px;
+}
+.no-coupon .coupon-right {
+  padding-left: 0;
 }
 </style>

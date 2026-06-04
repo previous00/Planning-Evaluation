@@ -49,6 +49,12 @@ const routes = [
         meta: { requiresAuth: true }
       },
       {
+        path: 'mall',
+        name: 'Mall',
+        component: () => import('../views/mall/MallPage.vue'),
+        meta: { requiresAuth: true }
+      },
+      {
         path: 'profile',
         name: 'Profile',
         component: () => import('../views/auth/Profile.vue'),

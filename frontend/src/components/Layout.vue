@@ -9,6 +9,7 @@
         <el-menu mode="horizontal" :ellipsis="false" class="nav-menu" router>
           <el-menu-item index="/">课程中心</el-menu-item>
           <el-menu-item index="/recommend" v-if="userStore.isLoggedIn">智能推荐</el-menu-item>
+          <el-menu-item index="/mall" v-if="userStore.isLoggedIn">积分商城</el-menu-item>
           <el-menu-item index="/learning" v-if="userStore.isLoggedIn">学习中心</el-menu-item>
           <el-menu-item index="/admin" v-if="userStore.isAdmin">后台管理</el-menu-item>
         </el-menu>
